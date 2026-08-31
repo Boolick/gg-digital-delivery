@@ -40,16 +40,14 @@ describe('Adversarial E2E Scenarios (TDD Concurrency Test Suite)', () => {
       // 2. Fire 50 simultaneous webhooks for the exact same order
       const concurrency = 50;
       const metrics = await runConcurrent(async (index) => {
-        const response = await harness.agent
-          .post('/api/webhooks/payment')
-          .send({
-            event_id: `evt_stampede_${orderId}_${index}`,
-            order_id: orderId,
-            status: 'paid',
-            amount: 1000,
-            currency: 'RUB',
-            created_at: new Date().toISOString(),
-          });
+        const response = await harness.agent.post('/api/webhooks/payment').send({
+          event_id: `evt_stampede_${orderId}_${index}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        });
         return {
           status: response.status,
           body: PaymentWebhookResponseSchema.parse(response.body),
@@ -213,13 +211,11 @@ describe('Adversarial E2E Scenarios (TDD Concurrency Test Suite)', () => {
       const concurrency = 50;
 
       const metrics = await runConcurrent(async (index) => {
-        const res = await harness.agent
-          .post('/api/orders')
-          .send({
-            sku: 'STEAM-TOPUP-1000',
-            promo_code: promoCode,
-            email: `user_${index}@example.com`,
-          });
+        const res = await harness.agent.post('/api/orders').send({
+          sku: 'STEAM-TOPUP-1000',
+          promo_code: promoCode,
+          email: `user_${index}@example.com`,
+        });
         return {
           status: res.status,
           order: CreateOrderResponseSchema.parse(res.body),
@@ -243,6 +239,202 @@ describe('Adversarial E2E Scenarios (TDD Concurrency Test Suite)', () => {
       // Check DB promocode state
       const promoEntity = harness.db.promocodes.get(promoCode);
       expect(promoEntity?.used_count).toBe(3);
+    });
+  });
+
+  // =========================================================================
+  // SCENARIO 6: Provider A Failure → Fallback to Provider B (BACK-04)
+  // =========================================================================
+  describe('Scenario 6: Provider A Failure → Fallback to Provider B (Deterministic Request ID)', () => {
+    it('should switch to Provider B when Provider A fails and deliver key with request_id tracking', async () => {
+      // 1. Configure test harness to simulate Provider A failure
+      harness.db.simulateProviderAFail = true;
+
+      // 2. Create order
+      const createRes = await harness.agent
+        .post('/api/orders')
+        .send({ sku: 'STEAM-TOPUP-1000', email: 'provider_test@example.com' })
+        .expect(201);
+      const { order_id: orderId } = CreateOrderResponseSchema.parse(createRes.body);
+
+      // 3. Payment webhook triggers delivery flow with Provider A failing and B succeeding
+      const webhookRes = await harness.agent
+        .post('/api/webhooks/payment')
+        .send({
+          event_id: `evt_prov_fallback_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(200);
+
+      const webhookBody = PaymentWebhookResponseSchema.parse(webhookRes.body);
+      expect(webhookBody.status).toBe('ok');
+
+      // 4. Verify order state and provider used
+      const statusRes = await harness.agent.get(`/api/orders/${orderId}`).expect(200);
+      const order = GetOrderStatusResponseSchema.parse(statusRes.body);
+      expect(order.status).toBe('delivered');
+      expect(order.key_code).toBeDefined();
+      expect(order.provider_used).toBe('B');
+
+      // 5. Verify exactly 1 key allocated
+      const assignedKeys = harness.db.getAssignedKeysForOrder(orderId);
+      expect(assignedKeys.length).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // SCENARIO 7: FSM Invalid Transitions Guard (BACK-01 TDD Contract)
+  // =========================================================================
+  describe('Scenario 7: FSM Invalid Transitions Guard', () => {
+    it('should NOT re-deliver key when a second payment webhook arrives for an already-delivered order with a different event_id', async () => {
+      // 1. Create order
+      const createRes = await harness.agent
+        .post('/api/orders')
+        .send({ sku: 'STEAM-TOPUP-1000', email: 'fsm@example.com' })
+        .expect(201);
+      const { order_id: orderId } = CreateOrderResponseSchema.parse(createRes.body);
+
+      // 2. First legitimate webhook → order becomes 'delivered'
+      const firstWebhookRes = await harness.agent
+        .post('/api/webhooks/payment')
+        .send({
+          event_id: `evt_fsm_first_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(200);
+      const firstBody = PaymentWebhookResponseSchema.parse(firstWebhookRes.body);
+      expect(firstBody.status).toBe('ok');
+
+      // 3. Verify order is now 'delivered' with exactly 1 key
+      const statusRes1 = await harness.agent.get(`/api/orders/${orderId}`).expect(200);
+      const deliveredOrder = GetOrderStatusResponseSchema.parse(statusRes1.body);
+      expect(deliveredOrder.status).toBe('delivered');
+      const firstKeyCode = deliveredOrder.key_code;
+      expect(firstKeyCode).toBeDefined();
+
+      // 4. Second webhook with a DIFFERENT event_id (bypasses deduplication filter)
+      //    The FSM guard must prevent re-delivery
+      const secondWebhookRes = await harness.agent
+        .post('/api/webhooks/payment')
+        .send({
+          event_id: `evt_fsm_second_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(200);
+      const secondBody = PaymentWebhookResponseSchema.parse(secondWebhookRes.body);
+      expect(['ok', 'ignored']).toContain(secondBody.status);
+
+      // 5. CRITICAL Invariant: still exactly 1 key assigned
+      const assignedKeys = harness.db.getAssignedKeysForOrder(orderId);
+      expect(assignedKeys.length).toBe(1);
+      expect(assignedKeys[0]?.key_code).toBe(firstKeyCode);
+
+      // 6. Order status unchanged
+      const statusRes2 = await harness.agent.get(`/api/orders/${orderId}`).expect(200);
+      const finalOrder = GetOrderStatusResponseSchema.parse(statusRes2.body);
+      expect(finalOrder.status).toBe('delivered');
+      expect(finalOrder.key_code).toBe(firstKeyCode);
+    });
+  });
+
+  // =========================================================================
+  // SCENARIO 8: Webhook HMAC Signature Guard (BACK-02 Security)
+  // =========================================================================
+  describe('Scenario 8: Webhook HMAC Signature Verification', () => {
+    it('should reject webhook with 401 when HMAC signature header is missing or invalid', async () => {
+      harness.db.requireWebhookHmac = true;
+
+      const createRes = await harness.agent
+        .post('/api/orders')
+        .send({ sku: 'STEAM-TOPUP-1000' })
+        .expect(201);
+      const { order_id: orderId } = CreateOrderResponseSchema.parse(createRes.body);
+
+      // 1. Request without signature header → 401 Unauthorized
+      await harness.agent
+        .post('/api/webhooks/payment')
+        .send({
+          event_id: `evt_unsigned_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(401);
+
+      // 2. Request with invalid signature header → 401 Unauthorized
+      await harness.agent
+        .post('/api/webhooks/payment')
+        .set('x-webhook-signature', 'sha256=invalid_signature_hash')
+        .send({
+          event_id: `evt_bad_sig_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(401);
+
+      // 3. Request with valid signature prefix → 200 OK
+      await harness.agent
+        .post('/api/webhooks/payment')
+        .set('x-webhook-signature', `sha256=${harness.db.webhookSecret}`)
+        .send({
+          event_id: `evt_valid_sig_${orderId}`,
+          order_id: orderId,
+          status: 'paid',
+          amount: 1000,
+          currency: 'RUB',
+          created_at: new Date().toISOString(),
+        })
+        .expect(200);
+    });
+  });
+
+  // =========================================================================
+  // SCENARIO 9: Admin Authentication Guard (BACK-06 Security)
+  // =========================================================================
+  describe('Scenario 9: Admin Bearer Token Authentication', () => {
+    it('should reject unauthenticated admin restock and retry delivery requests with 401', async () => {
+      harness.db.requireAdminAuth = true;
+
+      // 1. Restock without token → 401
+      await harness.agent
+        .post('/api/admin/keys/restock')
+        .send({ sku: 'STEAM-TOPUP-1000', keys: ['TEST_KEY_UNAUTH'] })
+        .expect(401);
+
+      // 2. Restock with invalid token → 401
+      await harness.agent
+        .post('/api/admin/keys/restock')
+        .set('Authorization', 'Bearer wrong-secret')
+        .send({ sku: 'STEAM-TOPUP-1000', keys: ['TEST_KEY_UNAUTH'] })
+        .expect(401);
+
+      // 3. Restock with valid token → 200 OK
+      const restockRes = await harness.agent
+        .post('/api/admin/keys/restock')
+        .set('Authorization', `Bearer ${harness.db.adminSecret}`)
+        .send({ sku: 'STEAM-TOPUP-1000', keys: ['TEST_KEY_AUTH_OK'] })
+        .expect(200);
+      expect(restockRes.body.success).toBe(true);
+
+      // 4. Retry delivery without auth → 401
+      await harness.agent.post('/api/admin/orders/some_order_id/retry-delivery').expect(401);
     });
   });
 });

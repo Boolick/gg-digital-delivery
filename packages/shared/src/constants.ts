@@ -17,7 +17,10 @@ export const ORDER_TRANSITION_MATRIX: Record<OrderStatus, readonly OrderStatus[]
 /**
  * Helper to check whether a transition between states is permitted.
  */
-export function isValidOrderTransition(currentStatus: OrderStatus, targetStatus: OrderStatus): boolean {
+export function isValidOrderTransition(
+  currentStatus: OrderStatus,
+  targetStatus: OrderStatus,
+): boolean {
   const allowed = ORDER_TRANSITION_MATRIX[currentStatus];
   return allowed ? allowed.includes(targetStatus) : false;
 }

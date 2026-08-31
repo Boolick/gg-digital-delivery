@@ -31,6 +31,11 @@ export class InMemoryTestDb {
   public orders: Map<string, Order> = new Map();
   public paymentEvents: Map<string, PaymentEventRecord> = new Map();
   public promocodes: Map<string, PromocodeEntity> = new Map();
+  public simulateProviderAFail = false;
+  public requireWebhookHmac = false;
+  public requireAdminAuth = false;
+  public adminSecret = 'test-admin-secret-2026';
+  public webhookSecret = 'test-webhook-secret-2026';
   private locks: Map<string, Promise<void>> = new Map();
 
   constructor() {
@@ -69,6 +74,9 @@ export class InMemoryTestDb {
         used_count: promo.used_count,
       });
     }
+    this.simulateProviderAFail = false;
+    this.requireWebhookHmac = false;
+    this.requireAdminAuth = false;
     this.locks.clear();
   }
 

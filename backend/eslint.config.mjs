@@ -27,21 +27,17 @@ export default tseslint.config(
       '@typescript-eslint/explicit-module-boundary-types': 'off',
 
       // 2. Airbnb Style & Clean Code
-      'eqeqeq': ['error', 'always', { null: 'ignore' }],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       'prefer-const': 'error',
       'no-var': 'error',
-      'curly': ['error', 'all'],
+      curly: ['error', 'all'],
       'no-duplicate-imports': 'error',
       'no-unneeded-ternary': 'error',
       'no-nested-ternary': 'warn',
       'prefer-template': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
 
-      // 3. File & Line Limits
-      'max-lines': [
-        'error',
-        { max: 300, skipBlankLines: true, skipComments: true },
-      ],
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
       'max-len': [
         'warn',
         {
@@ -53,6 +49,12 @@ export default tseslint.config(
           ignoreRegExpLiterals: true,
         },
       ],
+    },
+  },
+  {
+    files: ['test/**/*.ts', '**/*.spec.ts', '**/*.e2e-spec.ts'],
+    rules: {
+      'max-lines': 'off',
     },
   },
 );

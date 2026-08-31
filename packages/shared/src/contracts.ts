@@ -21,6 +21,29 @@ export const OrderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
+/**
+ * FSM_TRANSITIONS defines the allowed state machine transitions for OrderFsmService.
+ * Any transition NOT in this matrix MUST be rejected by OrderFsmService.
+ * Terminal states (delivered, payment_failed) have empty arrays — no exit.
+ * BACK-01: Used by Phase 2 OrderFsmService implementation.
+ */
+export const FSM_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
+  created: ['paid', 'payment_failed'],
+  paid: ['delivering'],
+  delivering: ['delivered', 'out_of_stock', 'delivery_failed'],
+  delivered: [],
+  payment_failed: [],
+  out_of_stock: ['delivering'],
+  delivery_failed: ['delivering'],
+} as const;
+
+export function isValidFsmTransition(from: OrderStatus, to: OrderStatus): boolean {
+  return (FSM_TRANSITIONS[from] as readonly OrderStatus[]).includes(to);
+}
+
+export const ProviderUsedSchema = z.enum(['A', 'B']).optional();
+export type ProviderUsed = z.infer<typeof ProviderUsedSchema>;
+
 export const PromocodeTypeSchema = z.enum(['percent', 'amount']);
 export type PromocodeType = z.infer<typeof PromocodeTypeSchema>;
 
@@ -78,6 +101,7 @@ export const OrderSchema = z.object({
   currency: CurrencySchema.default('RUB'),
   promo_code: z.string().optional(),
   key_code: z.string().optional(),
+  provider_used: ProviderUsedSchema,
   error_message: z.string().optional(),
   delivery_attempts: z.number().int().nonnegative().default(0),
   email: z.string().email().optional(),
@@ -96,6 +120,7 @@ export const GetOrderStatusResponseSchema = z.object({
   final_amount: z.number().nonnegative(),
   currency: CurrencySchema,
   key_code: z.string().optional(),
+  provider_used: ProviderUsedSchema,
   error_message: z.string().optional(),
   can_retry: z.boolean(),
   created_at: z.string(),
@@ -106,6 +131,8 @@ export type GetOrderStatusResponse = z.infer<typeof GetOrderStatusResponseSchema
 // ==========================================
 // 4. Payment Webhook Contract (ТЗ Standard)
 // ==========================================
+
+export const WEBHOOK_SIGNATURE_HEADER = 'x-webhook-signature';
 
 export const PaymentWebhookPayloadSchema = z.object({
   event_id: z.string().min(1, 'event_id is required'),

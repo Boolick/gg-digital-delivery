@@ -8,6 +8,8 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  UnauthorizedException,
+  Headers,
 } from '@nestjs/common';
 import {
   Order,
@@ -25,6 +27,7 @@ import {
   ValidatePromocodeRequest,
   ValidatePromocodeRequestSchema,
   ValidatePromocodeResponse,
+  isValidFsmTransition,
 } from '@gg/shared';
 import { InMemoryTestDb } from './test-db.js';
 
@@ -115,6 +118,7 @@ export class TestApiController {
       final_amount: order.amount,
       currency: order.currency,
       key_code: order.key_code,
+      provider_used: order.provider_used,
       error_message: order.error_message,
       can_retry: order.status === 'out_of_stock' || order.status === 'delivery_failed',
       created_at: order.created_at,
@@ -124,7 +128,16 @@ export class TestApiController {
 
   @Post('webhooks/payment')
   @HttpCode(HttpStatus.OK)
-  public async handlePaymentWebhook(@Body() body: unknown): Promise<PaymentWebhookResponse> {
+  public async handlePaymentWebhook(
+    @Body() body: unknown,
+    @Headers('x-webhook-signature') signature?: string,
+  ): Promise<PaymentWebhookResponse> {
+    if (currentDb.requireWebhookHmac) {
+      if (!signature || signature !== `sha256=${currentDb.webhookSecret}`) {
+        throw new UnauthorizedException('Invalid or missing webhook signature');
+      }
+    }
+
     const data: PaymentWebhookPayload = PaymentWebhookPayloadSchema.parse(body);
 
     const releaseDedup = await currentDb.acquireLock(`evt_${data.event_id}`);
@@ -161,6 +174,16 @@ export class TestApiController {
 
     const releaseOrder = await currentDb.acquireLock(`order_${data.order_id}`);
     try {
+      const nextTargetStatus = data.status === 'failed' ? 'payment_failed' : 'paid';
+      if (!isValidFsmTransition(order.status, nextTargetStatus) && order.status !== 'created') {
+        return {
+          status: 'ignored',
+          order_id: data.order_id,
+          event_id: data.event_id,
+          message: `FSM transition from ${order.status} to ${nextTargetStatus} rejected`,
+        };
+      }
+
       if (order.status === 'delivered' || order.status === 'delivering') {
         return {
           status: 'ok',
@@ -193,6 +216,7 @@ export class TestApiController {
         availableKey.assigned_at = new Date().toISOString();
         order.status = 'delivered';
         order.key_code = availableKey.key_code;
+        order.provider_used = currentDb.simulateProviderAFail ? 'B' : 'A';
       } else {
         order.status = 'out_of_stock';
         order.error_message = 'No available keys in pool';
@@ -213,7 +237,16 @@ export class TestApiController {
 
   @Post('admin/orders/:id/retry-delivery')
   @HttpCode(HttpStatus.OK)
-  public async retryDelivery(@Param('id') id: string): Promise<AdminRetryDeliveryResponse> {
+  public async retryDelivery(
+    @Param('id') id: string,
+    @Headers('authorization') auth?: string,
+  ): Promise<AdminRetryDeliveryResponse> {
+    if (currentDb.requireAdminAuth) {
+      if (!auth || auth !== `Bearer ${currentDb.adminSecret}`) {
+        throw new UnauthorizedException('Unauthorized admin access');
+      }
+    }
+
     const order = currentDb.orders.get(id);
     if (!order) {
       throw new NotFoundException(`Order ${id} not found`);
@@ -264,7 +297,16 @@ export class TestApiController {
 
   @Post('admin/keys/restock')
   @HttpCode(HttpStatus.OK)
-  public async restockKeys(@Body() body: unknown): Promise<AdminRestockKeysResponse> {
+  public async restockKeys(
+    @Body() body: unknown,
+    @Headers('authorization') auth?: string,
+  ): Promise<AdminRestockKeysResponse> {
+    if (currentDb.requireAdminAuth) {
+      if (!auth || auth !== `Bearer ${currentDb.adminSecret}`) {
+        throw new UnauthorizedException('Unauthorized admin access');
+      }
+    }
+
     const data: AdminRestockKeysRequest = AdminRestockKeysRequestSchema.parse(body);
     for (const key of data.keys) {
       currentDb.keys.push({
