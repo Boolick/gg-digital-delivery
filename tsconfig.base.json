@@ -4,6 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -23,6 +25,10 @@
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@gg/shared": ["./packages/shared/src/index.ts"],
+      "@gg/shared/*": ["./packages/shared/src/*"]
+    }
   }
 }

@@ -15,7 +15,8 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "paths": {
-      "*": ["./*"]
+      "@gg/shared": ["../packages/shared/src/index.ts"],
+      "@gg/shared/*": ["../packages/shared/src/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

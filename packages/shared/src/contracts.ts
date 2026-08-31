@@ -68,6 +68,24 @@ export const CreateOrderResponseSchema = z.object({
 });
 export type CreateOrderResponse = z.infer<typeof CreateOrderResponseSchema>;
 
+export const OrderSchema = z.object({
+  id: z.string().min(1),
+  sku: z.string().min(1),
+  status: OrderStatusSchema,
+  amount: z.number().nonnegative(),
+  original_amount: z.number().nonnegative(),
+  discount_amount: z.number().nonnegative().default(0),
+  currency: CurrencySchema.default('RUB'),
+  promo_code: z.string().optional(),
+  key_code: z.string().optional(),
+  error_message: z.string().optional(),
+  delivery_attempts: z.number().int().nonnegative().default(0),
+  email: z.string().email().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Order = z.infer<typeof OrderSchema>;
+
 export const GetOrderStatusResponseSchema = z.object({
   order_id: z.string().min(1),
   sku: z.string().min(1),
