@@ -1,0 +1,33 @@
+{
+  "name": "gg-digital-delivery",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fault-tolerant digital goods delivery and payment processing platform",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend",
+    "tests/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md}\"",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=backend",
+    "benchmark": "tsx scripts/adversarial-benchmark.ts",
+    "start:backend": "npm run start:dev --workspace=backend",
+    "start:frontend": "npm run dev --workspace=frontend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.24.1"
+  }
+}
