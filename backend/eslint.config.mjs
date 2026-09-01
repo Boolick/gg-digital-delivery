@@ -2,6 +2,11 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import globals from 'globals';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs', '*.d.ts'] },
@@ -12,6 +17,9 @@ export default tseslint.config(
       globals: {
         ...globals.node,
         ...globals.jest,
+      },
+      parserOptions: {
+        tsconfigRootDir: __dirname,
       },
       ecmaVersion: 2022,
     },
