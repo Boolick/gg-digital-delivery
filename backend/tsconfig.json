@@ -12,11 +12,11 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
     "sourceMap": true,
-    "rootDir": "..",
+    "rootDir": "src",
     "outDir": "./dist",
     "paths": {
-      "@gg/shared": ["../packages/shared/src/index.ts"],
-      "@gg/shared/*": ["../packages/shared/src/*"]
+      "@gg/shared": ["../packages/shared/dist/index.d.ts"],
+      "@gg/shared/*": ["../packages/shared/dist/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
@@ -26,5 +26,5 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src/**/*", "../packages/shared/src/**/*"]
+  "include": ["src/**/*"]
 }

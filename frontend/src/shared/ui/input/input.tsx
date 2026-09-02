@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/cn';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: React.ReactNode;
   error?: string;
   success?: boolean;
   leftIcon?: React.ReactNode;
@@ -10,9 +11,20 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, success, leftIcon, rightIcon, helperText, disabled, ...props }, ref) => {
+  (
+    { label, className, error, success, leftIcon, rightIcon, helperText, disabled, id, ...props },
+    ref,
+  ) => {
+    const inputId =
+      id || (typeof label === 'string' ? label.replace(/\s+/g, '-').toLowerCase() : undefined);
+
     return (
       <div className="w-full space-y-1.5">
+        {label && (
+          <label htmlFor={inputId} className="block text-xs font-semibold text-gray-700">
+            {label}
+          </label>
+        )}
         <div className="relative flex items-center">
           {leftIcon && (
             <div className="absolute left-3.5 text-text-muted pointer-events-none flex items-center justify-center">
@@ -20,6 +32,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
           <input
+            id={inputId}
             ref={ref}
             disabled={disabled}
             className={cn(
