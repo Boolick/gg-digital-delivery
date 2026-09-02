@@ -11,8 +11,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuy }) => {
 
   return (
     <div
+      data-testid={`product-card-${product.sku}`}
       onClick={() => onBuy?.(product)}
-      className="group bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+      className="group bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm hover:shadow-md hover:-translate-y-1.5 transition-all duration-200 cursor-pointer flex flex-col justify-between"
     >
       <div>
         {/* Game Cover Image */}
@@ -22,7 +23,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuy }) => {
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
-              // Fallback placeholder image if URL fails
               (e.target as HTMLImageElement).src =
                 'https://placehold.co/400x300/111827/FFFFFF?text=GG+Goods';
             }}
@@ -35,10 +35,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuy }) => {
         </h3>
       </div>
 
-      {/* Price Row & Buy CTA Button matching Figma */}
+      {/* Price Row & Buy CTA Button */}
       <div className="pt-2 border-t border-gray-100">
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-emerald-600 font-extrabold text-lg">
+          <span className="text-emerald-600 font-extrabold text-lg" data-testid="product-price">
             {product.price.toLocaleString('ru-RU')} ₽
           </span>
           <span className="text-gray-400 text-xs line-through">

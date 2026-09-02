@@ -22,15 +22,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
 
-    let message: unknown;
+    let errorName = 'Internal Server Error';
+    let message: string = 'Internal server error';
+    let details: unknown = undefined;
+
     if (exception instanceof HttpException) {
+      errorName = exception.name || 'HttpException';
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        message = (exceptionResponse as Record<string, unknown>)['message'] || exceptionResponse;
-      } else {
+        const resObj = exceptionResponse as Record<string, unknown>;
+        message = (resObj['message'] as string) || exception.message;
+        errorName = (resObj['error'] as string) || errorName;
+        details = resObj['details'];
+      } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       }
-    } else {
-      message = 'Internal server error';
     }
 
     const logMessage =
@@ -39,9 +44,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
+      error: errorName,
+      message,
+      ...(details ? { details } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
-      message,
     });
   }
 }

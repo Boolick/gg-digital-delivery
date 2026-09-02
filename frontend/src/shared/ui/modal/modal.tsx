@@ -9,9 +9,24 @@ export interface ModalProps {
   title?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className }) => {
+const SIZE_CLASSES = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+};
+
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  className,
+  size = 'md',
+}) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -46,7 +61,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       {/* Dialog content */}
       <div
         className={cn(
-          'relative z-10 w-full max-w-lg bg-surface-card border border-border-subtle rounded-card shadow-2xl p-6 animate-scale-in',
+          'relative z-10 w-full bg-surface-card border border-border-subtle rounded-card shadow-2xl p-6 animate-scale-in',
+          SIZE_CLASSES[size],
           className,
         )}
         role="dialog"

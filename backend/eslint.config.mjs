@@ -9,7 +9,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs', '*.d.ts'] },
+  {
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      '*.js',
+      '*.mjs',
+      '*.d.ts',
+      'src/database/**',
+    ],
+  },
   {
     extends: [eslint.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
     files: ['**/*.ts'],

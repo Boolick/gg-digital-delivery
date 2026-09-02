@@ -82,7 +82,13 @@ export class WebhooksService {
         };
       }
 
-      this.fsm.transition(order.status, 'delivering', order.id);
+      let currentStatus = order.status;
+      if (currentStatus === 'created') {
+        this.fsm.transition('created', 'paid', order.id);
+        currentStatus = 'paid';
+      }
+
+      this.fsm.transition(currentStatus, 'delivering', order.id);
       const localKey = await this.keysRepo.allocateKeyForOrder(client, order.sku, order.id);
       if (localKey) {
         this.fsm.transition('delivering', 'delivered', order.id);

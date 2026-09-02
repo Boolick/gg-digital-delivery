@@ -1,9 +1,12 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "../",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "rootDir": "../../",
     "types": ["jest", "node"],
     "isolatedModules": true
   },
-  "include": ["**/*", "../src/**/*"]
+  "include": ["**/*", "../src/**/*", "../../packages/shared/src/**/*"]
 }
